@@ -11,33 +11,33 @@ import           Test.Hspec
 
 data TestDB = TestDB
   { tempDB     :: Temp.DB
-  , connection :: Pool Connection
+  , pool :: Pool Connection
   }
 
 setupDB :: (Connection -> IO ()) -> IO TestDB
 setupDB migrate = do
   tempDB     <- either throwIO return =<< Temp.startAndLogToTmp []
   putStrLn $ Temp.connectionString tempDB
-  connection <- createPool
+  pool <- createPool
     (connectPostgreSQL (BSC.pack $ Temp.connectionString tempDB))
     close
     1
     100000000
     50
-  withResource connection migrate
+  withResource pool migrate
   return TestDB {..}
 
 teardownDB :: TestDB -> IO ()
 teardownDB TestDB {..} = do
-  destroyAllResources connection
+  destroyAllResources pool
   void $ Temp.stop tempDB
 
 withPool :: TestDB -> (Connection -> IO a) -> IO a
-withPool testDB = withResource (connection testDB)
+withPool testDB = withResource (pool testDB)
 
 withDB :: DB a -> TestDB -> IO a
 withDB action testDB =
-  withResource (connection testDB) (runDBTSerializable action)
+  withResource (pool testDB) (runDBTSerializable action)
 
 runDB :: TestDB -> DB a -> IO a
 runDB = flip withDB
