@@ -1,7 +1,7 @@
 name:                hspec-pg-transact
 version:             0.1.0.0
-synopsis: Hspec helpers for database testing
--- description:
+synopsis: Helpers for creating database tests with hspec and pg-transact
+description: Helpers for creating database tests with hspec and pg-transact
 homepage:            https://github.com/jfischoff/hspec-pg-transact#readme
 license:             BSD3
 license-file:        LICENSE
