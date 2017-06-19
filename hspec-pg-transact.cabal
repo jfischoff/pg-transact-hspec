@@ -23,7 +23,7 @@ description:
  .
  The libary also provides a few other functions for more fine grained control over running transactions in tests.
  .
-homepage:            https://github.com/jfischoff/hspec-pg-transact#readme
+homepage:            https://github.com/jfischoff/pg-transact-hspec#readme
 license:             BSD3
 license-file:        LICENSE
 author:              Jonathan Fischoff
@@ -50,4 +50,4 @@ library
 
 source-repository head
   type:     git
-  location: https://github.com/githubuser/hspec-pg-transact
+  location: https://github.com/jfischoff/pg-transact-hspec
