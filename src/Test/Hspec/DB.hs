@@ -22,41 +22,50 @@ Tests can be written with 'itDB' which is wrapper around 'it' that uses the pass
 The libary also provides a few other functions for more fine grained control over running transactions in tests.
 
 -}
-{-# LANGUAGE RecordWildCards #-}
+
 module Test.Hspec.DB where
-import           Control.Exception
+
 import           Control.Monad
 import           Data.Pool
-import qualified Database.Postgres.Temp       as Temp
 import           Database.PostgreSQL.Simple
 import           Database.PostgreSQL.Transact
+import qualified Database.Postgres.Temp       as Temp
 import           Test.Hspec
 
 data TestDB = TestDB
-  { tempDB     :: Temp.DB
+  { tempDB :: Temp.DB
   -- ^ Handle for temporary @postgres@ process
-  , pool :: Pool Connection
+  , pool   :: Pool Connection
   -- ^ Pool of 50 connections to the temporary @postgres@
   }
 
 -- | Start a temporary @postgres@ process and create a pool of connections to it
-setupDB :: (Connection -> IO ()) -> IO TestDB
-setupDB migrate = do
-  tempDB     <- either throwIO return =<< Temp.start
-  pool <- createPool
-    (connectPostgreSQL $ Temp.toConnectionString tempDB)
+setupDB :: (Connection -> IO ()) -> IO (Either Temp.StartError TestDB)
+setupDB = setupDBWithConfig Temp.defaultConfig
+
+-- | Start a temporary @postgres@ process using the provided configuration
+setupDBWithConfig :: Temp.Config
+  -> (Connection -> IO ())
+  -> IO (Either Temp.StartError TestDB)
+setupDBWithConfig c f =
+  traverse (wrapCallback f) =<< Temp.startConfig c
+
+wrapCallback :: (Connection -> IO ()) -> Temp.DB -> IO TestDB
+wrapCallback f d = do
+  p <- createPool
+    (connectPostgreSQL $ Temp.toConnectionString d)
     close
     1
     100000000
     50
-  withResource pool migrate
-  return TestDB {..}
+  withResource p f
+  pure $ TestDB d p
 
 -- | Drop all the connections and shutdown the @postgres@ process
 teardownDB :: TestDB -> IO ()
-teardownDB TestDB {..} = do
-  destroyAllResources pool
-  void $ Temp.stop tempDB
+teardownDB (TestDB d p) = do
+  destroyAllResources p
+  void $ Temp.stop d
 
 -- | Run an 'IO' action with a connection from the pool
 withPool :: TestDB -> (Connection -> IO a) -> IO a
@@ -76,6 +85,10 @@ runDB = flip withDB
 itDB :: String -> DB a -> SpecWith TestDB
 itDB msg action = it msg $ void . withDB action
 
+-- | Wraps 'describeDBWithConfig' using the default configuration
+describeDB :: (Connection -> IO ()) -> String -> SpecWith TestDB -> Spec
+describeDB = describeDBWithConfig Temp.defaultConfig
+
 -- | Wraps 'describe' with a
 --
 -- @
@@ -89,6 +102,11 @@ itDB msg action = it msg $ void . withDB action
 -- @
 --
 -- hook for stopping a db.
-describeDB :: (Connection -> IO ()) -> String -> SpecWith TestDB -> Spec
-describeDB migrate str =
-  beforeAll (setupDB migrate) . afterAll teardownDB . describe str
+describeDBWithConfig :: Temp.Config -> (Connection -> IO ()) -> String -> SpecWith TestDB -> Spec
+describeDBWithConfig c f s =
+  beforeAll (catch =<< setupDBWithConfig c f) . afterAll teardownDB . describe s
+  where
+    catch :: Either Temp.StartError TestDB -> IO TestDB
+    catch r = case r of
+      Left x   -> error (show x)
+      Right db -> pure db
