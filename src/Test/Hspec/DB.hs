@@ -31,19 +31,31 @@ import           Data.Pool
 import qualified Database.Postgres.Temp       as Temp
 import           Database.PostgreSQL.Simple
 import           Database.PostgreSQL.Transact
+import           GHC.IO.Handle
 import           Test.Hspec
-
 data TestDB = TestDB
-  { tempDB     :: Temp.DB
+  { tempDB :: Temp.DB
   -- ^ Handle for temporary @postgres@ process
-  , pool :: Pool Connection
+  , pool   :: Pool Connection
   -- ^ Pool of 50 connections to the temporary @postgres@
   }
 
 -- | Start a temporary @postgres@ process and create a pool of connections to it
+setupDBWithHandles :: Handle -> Handle -> (Connection -> IO ()) -> IO TestDB
+setupDBWithHandles stdout stderr f =
+  rethrowFailure f =<< Temp.startWithHandles [] stdout stderr
+
+-- | Start a temporary @postgres@ process and create a pool of connections to it
 setupDB :: (Connection -> IO ()) -> IO TestDB
-setupDB migrate = do
-  tempDB     <- either throwIO return =<< Temp.startAndLogToTmp []
+setupDB f =
+  rethrowFailure f =<< Temp.startAndLogToTmp []
+
+rethrowFailure :: Exception a => (Connection -> IO ()) -> Either a Temp.DB -> IO TestDB
+rethrowFailure f =
+  either throwIO (wrapCallback f)
+
+wrapCallback :: (Connection -> IO ()) -> Temp.DB -> IO TestDB
+wrapCallback f tempDB = do
   putStrLn $ Temp.connectionString tempDB
   pool <- createPool
     (connectPostgreSQL (BSC.pack $ Temp.connectionString tempDB))
@@ -51,8 +63,9 @@ setupDB migrate = do
     1
     100000000
     50
-  withResource pool migrate
-  return TestDB {..}
+  withResource pool f
+  pure TestDB{..}
+
 
 -- | Drop all the connections and shutdown the @postgres@ process
 teardownDB :: TestDB -> IO ()
