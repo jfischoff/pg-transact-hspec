@@ -26,7 +26,6 @@ The libary also provides a few other functions for more fine grained control ove
 module Test.Hspec.DB where
 import           Control.Exception
 import           Control.Monad
-import qualified Data.ByteString.Char8        as BSC
 import           Data.Pool
 import qualified Database.Postgres.Temp       as Temp
 import           Database.PostgreSQL.Simple
@@ -43,10 +42,9 @@ data TestDB = TestDB
 -- | Start a temporary @postgres@ process and create a pool of connections to it
 setupDB :: (Connection -> IO ()) -> IO TestDB
 setupDB migrate = do
-  tempDB     <- either throwIO return =<< Temp.startAndLogToTmp []
-  putStrLn $ Temp.connectionString tempDB
+  tempDB     <- either throwIO return =<< Temp.start
   pool <- createPool
-    (connectPostgreSQL (BSC.pack $ Temp.connectionString tempDB))
+    (connectPostgreSQL $ Temp.toConnectionString tempDB)
     close
     1
     100000000
