@@ -1,4 +1,4 @@
-# hspec-pg-transact
+# hspec-pg-transact [![CI](https://github.com/jfischoff/pg-transact-hspec/actions/workflows/ci.yml/badge.svg)](https://github.com/jfischoff/pg-transact-hspec/actions/workflows/ci.yml)
 
 Helpers for creating database tests with hspec and pg-transact
 
