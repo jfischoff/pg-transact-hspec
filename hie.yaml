@@ -1,0 +1,7 @@
+cradle:
+  stack:
+    components:
+    - path: "./src"
+      component: "hspec-pg-transact:lib"
+    - path: "./test"
+      component: "hspec-pg-transact:test:test"
